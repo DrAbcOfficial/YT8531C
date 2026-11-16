@@ -171,6 +171,14 @@ void test_eee(void)
 	YT_CHECK_EQ(yt8531c_eee_set(&fx.dev, 0x0006u), YT8531C_OK);
 	YT_CHECK_EQ(fx.mock.mmd_get(YT8531C_MMD7, 0x003cu), 0x0006u);
 	YT_CHECK_EQ(yt8531c_eee_get(&fx.dev, nullptr), YT8531C_ERR_ARG);
+
+	/* config_init advertises both EEE speeds when enabled. */
+	fx.cfg.eee_enable = 1;
+	fx.reload();
+	YT_CHECK_EQ(fx.init_board(), YT8531C_OK);
+	YT_CHECK_EQ(fx.mock.mmd_get(YT8531C_MMD7, 0x003cu),
+		    static_cast<yt_u16>(YT8531C_EEE_ABILITY_1000BASE_T |
+					YT8531C_EEE_ABILITY_100BASE_TX));
 }
 
 void test_loopback_test_mode(void)

@@ -353,6 +353,36 @@ void test_config_init_wol(void)
 		    1);
 }
 
+void test_drive_strength_mapping(void)
+{
+	yt_u8 strength = 0xff;
+
+	YT_CHECK_EQ(yt8531c_drive_strength_from_current(
+			    YT8531C_LDO_VOLTAGE_1V8, 3110u, &strength),
+		    YT8531C_OK);
+	YT_CHECK_EQ(strength, 4);
+
+	YT_CHECK_EQ(yt8531c_drive_strength_from_current(
+			    YT8531C_LDO_VOLTAGE_3V3, 5450u, &strength),
+		    YT8531C_OK);
+	YT_CHECK_EQ(strength, 5);
+
+	/* 2.5 V reuses the 1.8 V characterisation table. */
+	YT_CHECK_EQ(yt8531c_drive_strength_from_current(
+			    YT8531C_LDO_VOLTAGE_2V5, 2100u, &strength),
+		    YT8531C_OK);
+	YT_CHECK_EQ(strength, 1);
+
+	YT_CHECK_EQ(yt8531c_drive_strength_from_current(
+			    YT8531C_LDO_VOLTAGE_1V8, 9999u, &strength),
+		    YT8531C_ERR_RANGE);
+	YT_CHECK_EQ(yt8531c_drive_strength_from_current(3u, 1200u, &strength),
+		    YT8531C_ERR_ARG);
+	YT_CHECK_EQ(yt8531c_drive_strength_from_current(
+			    YT8531C_LDO_VOLTAGE_1V8, 1200u, nullptr),
+		    YT8531C_ERR_ARG);
+}
+
 void test_dump(void)
 {
 	Fixture fx;

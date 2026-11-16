@@ -20,6 +20,7 @@ int main(void)
 	yt_test_run("config_init_clock_output", test_config_init_clock_output);
 	yt_test_run("config_init_misc", test_config_init_misc);
 	yt_test_run("config_init_wol", test_config_init_wol);
+	yt_test_run("drive_strength_mapping", test_drive_strength_mapping);
 	yt_test_run("dump", test_dump);
 	yt_test_run("aneg", test_aneg);
 	yt_test_run("force_and_status", test_force_and_status);

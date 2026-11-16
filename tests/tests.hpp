@@ -14,6 +14,7 @@ void test_config_init_pad_drive(void);
 void test_config_init_clock_output(void);
 void test_config_init_misc(void);
 void test_config_init_wol(void);
+void test_drive_strength_mapping(void);
 void test_dump(void);
 void test_aneg(void);
 void test_force_and_status(void);
