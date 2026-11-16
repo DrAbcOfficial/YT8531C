@@ -6,12 +6,16 @@ project(yt8531c VERSION 1.0.0 LANGUAGES C CXX)
 # Options
 # ---------------------------------------------------------------------------
 option(YT8531C_BUILD_TESTS "Build the register-level unit tests" ON)
-option(YT8531C_BUILD_LINUX_USER "Build the Linux userspace MDIO tool" OFF)
+option(YT8531C_BUILD_LINUX_USER "Build the Linux userspace MDIO tool" ON)
 option(YT8531C_BUILD_LINUX_KMOD "Build the Linux phylib kernel module" OFF)
 option(YT8531C_WERROR "Treat compiler warnings as errors" ON)
 
 set(YT8531C_KERNEL_DIR "" CACHE PATH
     "Kernel build directory used when YT8531C_BUILD_LINUX_KMOD is enabled")
+set(YT8531C_KERNEL_ARCH "" CACHE STRING
+    "Optional ARCH= value passed to the kernel build (for cross builds)")
+set(YT8531C_KERNEL_CROSS_COMPILE "" CACHE STRING
+    "Optional CROSS_COMPILE= prefix passed to the kernel build")
 
 # ---------------------------------------------------------------------------
 # Language standard and common settings
