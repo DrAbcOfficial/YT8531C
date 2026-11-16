@@ -5,8 +5,6 @@
 #include "yt8531c_mdio_ioctl.h"
 
 #include <errno.h>
-#include <linux/mii.h>
-#include <linux/sockios.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -14,21 +12,31 @@
 #include <time.h>
 #include <unistd.h>
 
+static void fill_ifname(struct ifreq *ifr, const char *ifname)
+{
+	size_t len = strlen(ifname);
+
+	if (len >= IF_NAMESIZE)
+		len = IF_NAMESIZE - 1u;
+	memcpy(ifr->ifr_name, ifname, len);
+	ifr->ifr_name[len] = 0;
+}
+
 static int mdio_xfer(struct yt8531c_mdio_ctx *ctx, unsigned long request,
 		     yt_u8 reg, yt_u16 *value)
 {
 	struct ifreq ifr;
-	struct mii_ioctl_data *mii =
-		(struct mii_ioctl_data *)(void *)&ifr.ifr_data;
+	struct yt8531c_mii_ioctl mii;
 	int rc;
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, ctx->ifname, IF_NAMESIZE - 1);
+	fill_ifname(&ifr, ctx->ifname);
 
-	mii->phy_id = (yt_u16)ctx->phy_addr;
-	mii->reg_num = reg;
-	mii->val_in = (value != NULL) ? *value : 0;
-	mii->val_out = 0;
+	memset(&mii, 0, sizeof(mii));
+	mii.phy_id = (yt_u16)ctx->phy_addr;
+	mii.reg_num = reg;
+	mii.val_in = (value != NULL) ? *value : 0;
+	ifr.ifr_data = (char *)&mii;
 
 	rc = ioctl(ctx->fd, request, &ifr);
 	if (rc < 0) {
@@ -40,7 +48,7 @@ static int mdio_xfer(struct yt8531c_mdio_ctx *ctx, unsigned long request,
 	}
 
 	if (value != NULL)
-		*value = mii->val_out;
+		*value = mii.val_out;
 	return 0;
 }
 
@@ -88,8 +96,7 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 		      int phy_addr)
 {
 	struct ifreq ifr;
-	struct mii_ioctl_data *mii =
-		(struct mii_ioctl_data *)(void *)&ifr.ifr_data;
+	struct yt8531c_mii_ioctl mii;
 
 	if (ctx == NULL || ifname == NULL)
 		return -1;
@@ -98,7 +105,7 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->fd = -1;
-	strncpy(ctx->ifname, ifname, IF_NAMESIZE - 1);
+	memcpy(ctx->ifname, ifname, strlen(ifname) + 1u);
 
 	ctx->fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (ctx->fd < 0)
@@ -110,8 +117,9 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, ctx->ifname, IF_NAMESIZE - 1);
-	mii->phy_id = 0;
+	memset(&mii, 0, sizeof(mii));
+	fill_ifname(&ifr, ctx->ifname);
+	ifr.ifr_data = (char *)&mii;
 
 	if (ioctl(ctx->fd, SIOCGMIIPHY, &ifr) < 0) {
 		int saved = errno;
@@ -122,7 +130,7 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 		return -1;
 	}
 
-	ctx->phy_addr = mii->phy_id;
+	ctx->phy_addr = mii.phy_id;
 	return 0;
 }
 

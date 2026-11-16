@@ -15,6 +15,28 @@
 
 #include "yt8531c/yt8531c.h"
 
+/*
+ * The MII ioctl numbers and payload layout are part of the stable Linux UAPI.
+ * They are declared here instead of pulling in <linux/mii.h>, so the tool can
+ * be built against any libc (including musl) without kernel UAPI headers.
+ */
+#ifndef SIOCGMIIPHY
+#define SIOCGMIIPHY 0x8947
+#endif
+#ifndef SIOCGMIIREG
+#define SIOCGMIIREG 0x8948
+#endif
+#ifndef SIOCSMIIREG
+#define SIOCSMIIREG 0x8949
+#endif
+
+struct yt8531c_mii_ioctl {
+	yt_u16 phy_id;
+	yt_u16 reg_num;
+	yt_u16 val_in;
+	yt_u16 val_out;
+};
+
 struct yt8531c_mdio_ctx {
 	int fd;
 	char ifname[IF_NAMESIZE];
