@@ -493,8 +493,6 @@ static int yt8531c_phy_read_status(struct phy_device *phydev)
 	phydev->duplex = (status.duplex == YT8531C_DUPLEX_FULL)
 				 ? DUPLEX_FULL
 				 : DUPLEX_HALF;
-	phydev->pause = status.tx_pause;
-	phydev->asym_pause = status.rx_pause;
 
 	if (status.mdix == 2u)
 		phydev->mdix = ETH_TP_MDI_INVALID;
@@ -520,6 +518,9 @@ static int yt8531c_phy_read_status(struct phy_device *phydev)
 		mii_stat1000_mod_linkmode_lpa_t(phydev->lp_advertising,
 						status.stat1000);
 	}
+
+	/* Resolve the pause mode from our advertisement and the partner's. */
+	phy_resolve_aneg_pause(phydev);
 
 	return 0;
 }
