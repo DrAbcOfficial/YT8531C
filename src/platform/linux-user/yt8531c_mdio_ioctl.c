@@ -26,17 +26,22 @@ static int mdio_xfer(struct yt8531c_mdio_ctx *ctx, unsigned long request,
 		     yt_u8 reg, yt_u16 *value)
 {
 	struct ifreq ifr;
-	struct yt8531c_mii_ioctl mii;
+	/*
+	 * MII ioctls carry their payload inside ifr_ifru itself; ifr_data is
+	 * not a pointer to a separate structure.  The kernel's if_mii() casts
+	 * &ifr->ifr_ifru to struct mii_ioctl_data, so the fields must live in
+	 * the ifreq buffer.
+	 */
+	struct yt8531c_mii_ioctl *mii =
+		(struct yt8531c_mii_ioctl *)(void *)&ifr.ifr_data;
 	int rc;
 
 	memset(&ifr, 0, sizeof(ifr));
 	fill_ifname(&ifr, ctx->ifname);
-
-	memset(&mii, 0, sizeof(mii));
-	mii.phy_id = (yt_u16)ctx->phy_addr;
-	mii.reg_num = reg;
-	mii.val_in = (value != NULL) ? *value : 0;
-	ifr.ifr_data = (char *)&mii;
+	memset(mii, 0, sizeof(*mii));
+	mii->phy_id = (yt_u16)ctx->phy_addr;
+	mii->reg_num = reg;
+	mii->val_in = (value != NULL) ? *value : 0;
 
 	rc = ioctl(ctx->fd, request, &ifr);
 	if (rc < 0) {
@@ -48,7 +53,7 @@ static int mdio_xfer(struct yt8531c_mdio_ctx *ctx, unsigned long request,
 	}
 
 	if (value != NULL)
-		*value = mii.val_out;
+		*value = mii->val_out;
 	return 0;
 }
 
@@ -96,7 +101,8 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 		      int phy_addr)
 {
 	struct ifreq ifr;
-	struct yt8531c_mii_ioctl mii;
+	struct yt8531c_mii_ioctl *mii =
+		(struct yt8531c_mii_ioctl *)(void *)&ifr.ifr_data;
 
 	if (ctx == NULL || ifname == NULL)
 		return -1;
@@ -117,9 +123,8 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	memset(&mii, 0, sizeof(mii));
 	fill_ifname(&ifr, ctx->ifname);
-	ifr.ifr_data = (char *)&mii;
+	memset(mii, 0, sizeof(*mii));
 
 	if (ioctl(ctx->fd, SIOCGMIIPHY, &ifr) < 0) {
 		int saved = errno;
@@ -130,7 +135,7 @@ int yt8531c_mdio_open(struct yt8531c_mdio_ctx *ctx, const char *ifname,
 		return -1;
 	}
 
-	ctx->phy_addr = mii.phy_id;
+	ctx->phy_addr = mii->phy_id;
 	return 0;
 }
 
