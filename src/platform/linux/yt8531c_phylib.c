@@ -59,7 +59,7 @@ static int yt8531c_port_read(void *ctx, yt_u8 phy_addr, yt_u8 reg,
 
 	(void)phy_addr;
 
-	ret = phy_read(phydev, reg);
+	ret = __phy_read(phydev, reg);
 	if (ret < 0)
 		return -1;
 
@@ -75,7 +75,7 @@ static int yt8531c_port_write(void *ctx, yt_u8 phy_addr, yt_u8 reg,
 
 	(void)phy_addr;
 
-	ret = phy_write(phydev, reg, value);
+	ret = __phy_write(phydev, reg, value);
 	return (ret < 0) ? -1 : 0;
 }
 
@@ -311,15 +311,21 @@ static int yt8531c_phy_probe(struct phy_device *phydev)
 		return ret;
 
 	port = yt8531c_linux_port(phydev);
+	phy_lock_mdio_bus(phydev);
 	ret = yt8531c_errno(yt8531c_init(&priv->dev, &cfg, &port));
+	if (ret == 0)
+		ret = yt8531c_errno(yt8531c_probe(&priv->dev, &id));
+	phy_unlock_mdio_bus(phydev);
 	if (ret != 0)
 		return ret;
 
-	ret = yt8531c_errno(yt8531c_probe(&priv->dev, &id));
+	ret = yt8531c_resolve_drive_strengths(phydev, priv);
 	if (ret != 0)
 		return ret;
 
-	return yt8531c_resolve_drive_strengths(phydev, priv);
+	phydev_info(phydev, "YT8531C core probed, chip config 0x%04x\n",
+		    priv->dev.chip_config);
+	return 0;
 }
 
 static int yt8531c_phy_get_features(struct phy_device *phydev)
@@ -331,7 +337,9 @@ static int yt8531c_phy_get_features(struct phy_device *phydev)
 	if (priv == NULL)
 		return -ENODEV;
 
+	phy_lock_mdio_bus(phydev);
 	ret = yt8531c_errno(yt8531c_get_features(&priv->dev, &features));
+	phy_unlock_mdio_bus(phydev);
 	if (ret != 0)
 		return ret;
 
@@ -373,20 +381,30 @@ static int yt8531c_phy_config_init(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
 
+	int ret;
+
 	if (priv == NULL)
 		return -ENODEV;
 
-	return yt8531c_errno(yt8531c_config_init(&priv->dev));
+	phy_lock_mdio_bus(phydev);
+	ret = yt8531c_errno(yt8531c_config_init(&priv->dev));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static int yt8531c_soft_reset(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
 
+	int ret;
+
 	if (priv == NULL)
 		return -ENODEV;
 
-	return yt8531c_errno(yt8531c_reset(&priv->dev));
+	phy_lock_mdio_bus(phydev);
+	ret = yt8531c_errno(yt8531c_reset(&priv->dev));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static u8 yt8531c_master_slave_from_ethtool(u8 cfg)
@@ -411,14 +429,19 @@ static int yt8531c_phy_config_aneg(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
 	yt_u16 modes = 0;
+	int ret;
 
 	if (priv == NULL)
 		return -ENODEV;
 
-	if (phydev->autoneg == AUTONEG_DISABLE)
-		return yt8531c_errno(yt8531c_force_link(&priv->dev,
-							phydev->speed,
-							phydev->duplex));
+	if (phydev->autoneg == AUTONEG_DISABLE) {
+		phy_lock_mdio_bus(phydev);
+		ret = yt8531c_errno(yt8531c_force_link(&priv->dev,
+						       phydev->speed,
+						       phydev->duplex));
+		phy_unlock_mdio_bus(phydev);
+		return ret;
+	}
 
 	if (linkmode_test_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
 			      phydev->advertising))
@@ -446,7 +469,10 @@ static int yt8531c_phy_config_aneg(struct phy_device *phydev)
 	priv->dev.cfg.master_slave =
 		yt8531c_master_slave_from_ethtool(phydev->master_slave_set);
 
-	return yt8531c_errno(yt8531c_config_aneg(&priv->dev));
+	phy_lock_mdio_bus(phydev);
+	ret = yt8531c_errno(yt8531c_config_aneg(&priv->dev));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static int yt8531c_phy_read_status(struct phy_device *phydev)
@@ -458,7 +484,9 @@ static int yt8531c_phy_read_status(struct phy_device *phydev)
 	if (priv == NULL)
 		return -ENODEV;
 
+	phy_lock_mdio_bus(phydev);
 	ret = yt8531c_errno(yt8531c_read_status(&priv->dev, &status));
+	phy_unlock_mdio_bus(phydev);
 	if (ret != 0)
 		return ret;
 
@@ -529,20 +557,30 @@ static int yt8531c_phy_suspend(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
 
+	int ret;
+
 	if (priv == NULL)
 		return -ENODEV;
 
-	return yt8531c_errno(yt8531c_suspend(&priv->dev));
+	phy_lock_mdio_bus(phydev);
+	ret = yt8531c_errno(yt8531c_suspend(&priv->dev));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static int yt8531c_phy_resume(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
 
+	int ret;
+
 	if (priv == NULL)
 		return -ENODEV;
 
-	return yt8531c_errno(yt8531c_resume(&priv->dev));
+	phy_lock_mdio_bus(phydev);
+	ret = yt8531c_errno(yt8531c_resume(&priv->dev));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static void yt8531c_phy_get_wol(struct phy_device *phydev,
@@ -566,21 +604,27 @@ static int yt8531c_phy_set_wol(struct phy_device *phydev,
 	if (priv == NULL)
 		return -ENODEV;
 
+	phy_lock_mdio_bus(phydev);
 	if ((wol->wolopts & WAKE_MAGIC) != 0u) {
 		const u8 *address;
 
-		if (phydev->attached_dev == NULL)
+		if (phydev->attached_dev == NULL) {
+			phy_unlock_mdio_bus(phydev);
 			return -ENODEV;
+		}
 
 		address = phydev->attached_dev->dev_addr;
-		if (!is_valid_ether_addr(address))
+		if (!is_valid_ether_addr(address)) {
+			phy_unlock_mdio_bus(phydev);
 			return -EINVAL;
+		}
 
 		rc = yt8531c_wol_set(&priv->dev, address, 1, 0,
 				     YT8531C_WOL_PULSE_672MS);
 	} else {
 		rc = yt8531c_wol_set(&priv->dev, NULL, 0, 0, 0);
 	}
+	phy_unlock_mdio_bus(phydev);
 
 	return yt8531c_errno(rc);
 }
@@ -598,25 +642,32 @@ static int yt8531c_config_intr(struct phy_device *phydev)
 		       ? priv->dev.cfg.int_mask
 		       : 0u;
 
+	phy_lock_mdio_bus(phydev);
 	ret = yt8531c_errno(yt8531c_irq_clear(&priv->dev));
-	if (ret != 0)
-		return ret;
-
-	return yt8531c_errno(yt8531c_irq_set_mask(&priv->dev, mask));
+	if (ret == 0)
+		ret = yt8531c_errno(yt8531c_irq_set_mask(&priv->dev, mask));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static irqreturn_t yt8531c_handle_interrupt(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
-	yt_u16 events = 0;
+	int ret;
 
 	if (priv == NULL)
 		return IRQ_NONE;
 
-	if (yt8531c_irq_read(&priv->dev, &events) != YT8531C_OK)
+	/*
+	 * This runs in interrupt context, so use the self-locking single
+	 * transfer accessor instead of taking the bus lock around the core.
+	 */
+	ret = phy_read(phydev, YT8531C_REG_INT_STATUS);
+
+	if (ret < 0)
 		return IRQ_NONE;
 
-	return (events != 0u) ? IRQ_HANDLED : IRQ_NONE;
+	return (ret != 0) ? IRQ_HANDLED : IRQ_NONE;
 }
 
 #define YT8531C_LED_RULES                                                \
@@ -687,6 +738,7 @@ static int yt8531c_led_hw_control_set(struct phy_device *phydev, u8 index,
 {
 	struct yt8531c_phy *priv = phydev->priv;
 	struct yt8531c_led_cfg cfg = {};
+	int ret;
 
 	if (priv == NULL)
 		return -ENODEV;
@@ -697,7 +749,10 @@ static int yt8531c_led_hw_control_set(struct phy_device *phydev, u8 index,
 	cfg.blink_freq1 = YT8531C_AUTO;
 	cfg.blink_freq2 = YT8531C_AUTO;
 
-	return yt8531c_errno(yt8531c_led_set(&priv->dev, index, &cfg));
+	phy_lock_mdio_bus(phydev);
+	ret = yt8531c_errno(yt8531c_led_set(&priv->dev, index, &cfg));
+	phy_unlock_mdio_bus(phydev);
+	return ret;
 }
 
 static int yt8531c_led_hw_control_get(struct phy_device *phydev, u8 index,
@@ -710,7 +765,9 @@ static int yt8531c_led_hw_control_get(struct phy_device *phydev, u8 index,
 	if (priv == NULL)
 		return -ENODEV;
 
+	phy_lock_mdio_bus(phydev);
 	ret = yt8531c_errno(yt8531c_led_get(&priv->dev, index, &cfg));
+	phy_unlock_mdio_bus(phydev);
 	if (ret != 0)
 		return ret;
 
