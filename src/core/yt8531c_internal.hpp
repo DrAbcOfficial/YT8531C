@@ -273,12 +273,18 @@ inline bool delay_to_steps(yt_u16 ps, yt_u16 *steps)
 	return true;
 }
 
+#if defined(__GNUC__) && !defined(_WIN32)
+#define YT8531C_INTERNAL_API __attribute__((visibility("hidden")))
+#else
+#define YT8531C_INTERNAL_API
+#endif
+
 /*
  * Program the auto-negotiation advertisement registers from
  * yt8531c_config::advertise.  Defined in yt8531c_link.cpp and shared with the
  * initialisation path; it never restarts auto-negotiation.
  */
-yt_rc program_advertisement(yt8531c_dev *dev);
+YT8531C_INTERNAL_API yt_rc program_advertisement(yt8531c_dev *dev);
 
 inline bool mac_is_valid(const yt_u8 mac[6])
 {

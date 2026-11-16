@@ -90,6 +90,9 @@ yt_rc yt8531c_reset(yt8531c_dev *dev);
  * strength, interrupt pin mode and mask, Sync-E clock output, auto-sleep and
  * PLL retention, jumbo frames, EEE advertisement, WOL and auto-negotiation
  * advertisement.  Safe to call repeatedly and after yt8531c_reset().
+ *
+ * Speed auto-downgrade settings are programmed here but, as documented by the
+ * datasheet, only take effect after the next PHY reset.
  */
 yt_rc yt8531c_config_init(yt8531c_dev *dev);
 

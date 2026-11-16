@@ -394,8 +394,7 @@ yt_rc yt8531c_init(yt8531c_dev *dev, const yt8531c_config *cfg,
 	dev->struct_size = static_cast<yt_u32>(sizeof(*dev));
 	dev->cfg = *cfg;
 	dev->port = *port;
-	dev->int_mask = (cfg->int_mask != 0u) ? cfg->int_mask
-					      : YT8531C_IRQ_MASK_DEFAULT;
+	dev->int_mask = cfg->int_mask;
 	dev->magic = YT8531C_DEV_MAGIC;
 	dev->ldo_voltage = YT8531C_LDO_VOLTAGE_3V3;
 
@@ -653,6 +652,14 @@ yt_rc yt8531c_set_loopback(yt8531c_dev *dev, yt_u8 mode)
 	case YT8531C_LOOPBACK_OFF:
 		break;
 	case YT8531C_LOOPBACK_DIGITAL:
+		/* Make sure a remote loopback is not left enabled. */
+		rc = yt8531c::detail::ext_modify(
+			dev, YT8531C_EXT_MISC_CFG,
+			YT8531C_MISC_CFG_REMOTE_LOOPBACK |
+				YT8531C_MISC_CFG_ULDATA_RLOOPBACK,
+			0u);
+		if (rc != YT8531C_OK)
+			return rc;
 		return yt8531c::detail::mii_modify(dev, YT8531C_REG_BMCR,
 						   YT8531C_BMCR_LOOPBACK,
 						   YT8531C_BMCR_LOOPBACK);

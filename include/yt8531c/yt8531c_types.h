@@ -94,13 +94,25 @@ typedef int yt_rc;
 #define YT8531C_GENMASK(hi, lo) \
 	(((~0u) << (lo)) & (~0u >> (31 - (hi))))
 #endif
+/* Number of low zero bits of a contiguous field mask. */
+static inline yt_u32 yt8531c_field_shift(yt_u32 mask)
+{
+	yt_u32 shift = 0u;
+
+	while (mask != 0u && (mask & 1u) == 0u) {
+		mask >>= 1;
+		++shift;
+	}
+	return shift;
+}
+
 #ifndef YT8531C_FIELD_GET
 #define YT8531C_FIELD_GET(mask, val) \
-	(((yt_u32)(val) & (mask)) >> (__builtin_ctz((mask))))
+	(((yt_u32)(val) & (yt_u32)(mask)) >> yt8531c_field_shift((mask)))
 #endif
 #ifndef YT8531C_FIELD_PREP
 #define YT8531C_FIELD_PREP(mask, val) \
-	(((yt_u32)(val) << (__builtin_ctz((mask)))) & (mask))
+	((((yt_u32)(val)) << yt8531c_field_shift((mask))) & (yt_u32)(mask))
 #endif
 #ifndef YT8531C_ARRAY_SIZE
 #define YT8531C_ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
