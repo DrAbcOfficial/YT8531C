@@ -114,8 +114,11 @@ if(YT8531C_BUILD_LINUX_USER AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     add_executable(yt8531cctl src/platform/linux-user/yt8531c_cli.c)
     target_link_libraries(yt8531cctl PRIVATE yt8531c yt8531c_mdio)
-    # C linker on purpose: the core needs no C++ runtime.
+    # C linker on purpose: the core needs no C++ runtime.  --as-needed makes
+    # sure an implicitly added libstdc++ is dropped again when nothing from it
+    # is referenced.
     set_target_properties(yt8531cctl PROPERTIES LINKER_LANGUAGE C)
+    target_link_options(yt8531cctl PRIVATE "LINKER:--as-needed")
     target_compile_options(yt8531cctl PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow -Wundef)
     if(YT8531C_WERROR)
@@ -159,6 +162,7 @@ if(YT8531C_BUILD_TESTS)
     add_executable(yt8531c_abi_test tests/test_abi.c)
     target_link_libraries(yt8531c_abi_test PRIVATE yt8531c)
     set_target_properties(yt8531c_abi_test PROPERTIES LINKER_LANGUAGE C)
+    target_link_options(yt8531c_abi_test PRIVATE "LINKER:--as-needed")
     if(MSVC)
         target_compile_options(yt8531c_abi_test PRIVATE /W4)
         if(YT8531C_WERROR)
