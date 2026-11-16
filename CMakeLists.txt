@@ -9,6 +9,8 @@ option(YT8531C_BUILD_TESTS "Build the register-level unit tests" ON)
 option(YT8531C_BUILD_LINUX_USER "Build the Linux userspace MDIO tool" ON)
 option(YT8531C_BUILD_LINUX_KMOD "Build the Linux phylib kernel module" OFF)
 option(YT8531C_WERROR "Treat compiler warnings as errors" ON)
+option(YT8531C_BUILD_FREESTANDING
+       "Build the core as a freestanding object without headers or runtime" ON)
 
 set(YT8531C_KERNEL_DIR "" CACHE PATH
     "Kernel build directory used when YT8531C_BUILD_LINUX_KMOD is enabled")
@@ -54,7 +56,6 @@ target_include_directories(yt8531c
 
 # The core must never touch an OS or a C/C++ runtime.  These flags are part of
 # the contract, not a style preference.
-target_compile_definitions(yt8531c PRIVATE YT8531C_VERSION_STRING="1.0.0")
 
 if(MSVC)
     target_compile_options(yt8531c PRIVATE /W4 /EHs-c- /GR-)
@@ -68,6 +69,30 @@ else()
         -fno-use-cxa-atexit)
     if(YT8531C_WERROR)
         target_compile_options(yt8531c PRIVATE -Werror)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Freestanding compile check
+# ---------------------------------------------------------------------------
+if(YT8531C_BUILD_FREESTANDING)
+    add_library(yt8531c_freestanding OBJECT ${YT8531C_CORE_SOURCES})
+    target_include_directories(yt8531c_freestanding PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/core)
+    if(MSVC)
+        target_compile_options(yt8531c_freestanding PRIVATE /X /W4 /EHs-c- /GR-)
+        if(YT8531C_WERROR)
+            target_compile_options(yt8531c_freestanding PRIVATE /WX)
+        endif()
+    else()
+        target_compile_options(yt8531c_freestanding PRIVATE
+            -ffreestanding -nostdinc -fno-builtin
+            -fno-exceptions -fno-rtti -fno-threadsafe-statics
+            -fno-use-cxa-atexit -Wall -Wextra -Wpedantic -Wshadow -Wundef)
+        if(YT8531C_WERROR)
+            target_compile_options(yt8531c_freestanding PRIVATE -Werror)
+        endif()
     endif()
 endif()
 
@@ -87,6 +112,8 @@ if(YT8531C_BUILD_LINUX_USER AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     add_executable(yt8531cctl src/platform/linux-user/yt8531c_cli.c)
     target_link_libraries(yt8531cctl PRIVATE yt8531c yt8531c_mdio)
+    # C linker on purpose: the core needs no C++ runtime.
+    set_target_properties(yt8531cctl PROPERTIES LINKER_LANGUAGE C)
     target_compile_options(yt8531cctl PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow -Wundef)
     if(YT8531C_WERROR)
@@ -108,11 +135,19 @@ if(YT8531C_BUILD_TESTS)
         tests/test_link.cpp
         tests/test_peripheral.cpp)
     target_link_libraries(yt8531c_tests PRIVATE yt8531c)
-    target_compile_options(yt8531c_tests PRIVATE
-        $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic -Wshadow -Wundef>)
-    if(YT8531C_WERROR)
+    set_target_properties(yt8531c_tests PROPERTIES LINKER_LANGUAGE C)
+    if(MSVC)
+        target_compile_options(yt8531c_tests PRIVATE /W4)
+        if(YT8531C_WERROR)
+            target_compile_options(yt8531c_tests PRIVATE /WX)
+        endif()
+    else()
         target_compile_options(yt8531c_tests PRIVATE
-            $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
+            $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic -Wshadow -Wundef>)
+        if(YT8531C_WERROR)
+            target_compile_options(yt8531c_tests PRIVATE
+                $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
+        endif()
     endif()
 
     add_test(NAME yt8531c_core COMMAND yt8531c_tests)
@@ -122,10 +157,17 @@ if(YT8531C_BUILD_TESTS)
     add_executable(yt8531c_abi_test tests/test_abi.c)
     target_link_libraries(yt8531c_abi_test PRIVATE yt8531c)
     set_target_properties(yt8531c_abi_test PROPERTIES LINKER_LANGUAGE C)
-    target_compile_options(yt8531c_abi_test PRIVATE
-        -Wall -Wextra -Wpedantic -Wshadow -Wundef)
-    if(YT8531C_WERROR)
-        target_compile_options(yt8531c_abi_test PRIVATE -Werror)
+    if(MSVC)
+        target_compile_options(yt8531c_abi_test PRIVATE /W4)
+        if(YT8531C_WERROR)
+            target_compile_options(yt8531c_abi_test PRIVATE /WX)
+        endif()
+    else()
+        target_compile_options(yt8531c_abi_test PRIVATE
+            -Wall -Wextra -Wpedantic -Wshadow -Wundef)
+        if(YT8531C_WERROR)
+            target_compile_options(yt8531c_abi_test PRIVATE -Werror)
+        endif()
     endif()
     add_test(NAME yt8531c_abi COMMAND yt8531c_abi_test)
 endif()

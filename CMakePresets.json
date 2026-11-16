@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "YT8531C_WERROR": "ON"
+      }
+    },
+    {
+      "name": "default",
+      "inherits": "base",
+      "displayName": "Native build with tests and userspace tool"
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Native debug build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "kmod",
+      "inherits": "base",
+      "displayName": "Native build plus Linux kernel module",
+      "cacheVariables": {
+        "YT8531C_BUILD_LINUX_KMOD": "ON",
+        "YT8531C_KERNEL_DIR": "$env{YT8531C_KERNEL_DIR}"
+      }
+    },
+    {
+      "name": "i686-linux-gnu",
+      "inherits": "base",
+      "displayName": "i686 Linux glibc",
+      "toolchainFile": "cmake/toolchains/i686-linux-gnu.cmake"
+    },
+    {
+      "name": "armv7-linux-gnu",
+      "inherits": "base",
+      "displayName": "ARMv7 Linux glibc (hard float)",
+      "toolchainFile": "cmake/toolchains/armv7-linux-gnu.cmake"
+    },
+    {
+      "name": "aarch64-linux-gnu",
+      "inherits": "base",
+      "displayName": "AArch64 Linux glibc",
+      "toolchainFile": "cmake/toolchains/aarch64-linux-gnu.cmake"
+    },
+    {
+      "name": "x86_64-linux-musl",
+      "inherits": "base",
+      "displayName": "x86_64 Linux musl",
+      "toolchainFile": "cmake/toolchains/x86_64-linux-musl.cmake",
+      "cacheVariables": {
+        "MUSL_ROOT": "$env{MUSL_ROOT_X86_64}"
+      }
+    },
+    {
+      "name": "i686-linux-musl",
+      "inherits": "base",
+      "displayName": "i686 Linux musl",
+      "toolchainFile": "cmake/toolchains/i686-linux-musl.cmake",
+      "cacheVariables": {
+        "MUSL_ROOT": "$env{MUSL_ROOT_I686}"
+      }
+    },
+    {
+      "name": "armv7-linux-musl",
+      "inherits": "base",
+      "displayName": "ARMv7 Linux musl",
+      "toolchainFile": "cmake/toolchains/armv7-linux-musl.cmake",
+      "cacheVariables": {
+        "MUSL_ROOT": "$env{MUSL_ROOT_ARMV7}"
+      }
+    },
+    {
+      "name": "aarch64-linux-musl",
+      "inherits": "base",
+      "displayName": "AArch64 Linux musl",
+      "toolchainFile": "cmake/toolchains/aarch64-linux-musl.cmake",
+      "cacheVariables": {
+        "MUSL_ROOT": "$env{MUSL_ROOT_AARCH64}"
+      }
+    }
+  ]
+}
