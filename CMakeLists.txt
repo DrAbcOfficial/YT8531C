@@ -9,6 +9,8 @@ option(YT8531C_BUILD_TESTS "Build the register-level unit tests" ON)
 option(YT8531C_BUILD_LINUX_USER "Build the Linux userspace MDIO tool" ON)
 option(YT8531C_BUILD_LINUX_KMOD "Build the Linux phylib kernel module" OFF)
 option(YT8531C_WERROR "Treat compiler warnings as errors" ON)
+option(YT8531C_KMOD_MODPOST_WARN
+       "Turn unresolved kernel module symbols into modpost warnings" OFF)
 option(YT8531C_BUILD_FREESTANDING
        "Build the core as a freestanding object without headers or runtime" ON)
 

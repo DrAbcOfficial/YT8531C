@@ -1,0 +1,186 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  native:
+    name: native / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+            extra: ""
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            extra: clang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake make g++ ${{ matrix.extra }}
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DYT8531C_WERROR=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Check C++ runtime independence
+        run: |
+          if readelf -d build/yt8531cctl | grep -q 'libstdc++'; then
+            echo "yt8531cctl must not depend on libstdc++" >&2
+            exit 1
+          fi
+
+  cross-glibc:
+    name: glibc / ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: i686
+            toolchain: i686-linux-gnu
+            packages: gcc-i686-linux-gnu g++-i686-linux-gnu
+            qemu: qemu-i386-static
+          - arch: armv7
+            toolchain: armv7-linux-gnu
+            packages: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+            qemu: qemu-arm-static
+          - arch: aarch64
+            toolchain: aarch64-linux-gnu
+            packages: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            qemu: qemu-aarch64-static
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake make qemu-user-static ${{ matrix.packages }}
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/${{ matrix.toolchain }}.cmake \
+            -DYT8531C_WERROR=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test under qemu-user
+        run: |
+          ${{ matrix.qemu }} build/yt8531c_tests
+          ${{ matrix.qemu }} build/yt8531c_abi_test
+
+  musl:
+    name: musl / ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            packages: ""
+            qemu: ""
+          - arch: i686
+            packages: gcc-i686-linux-gnu g++-i686-linux-gnu
+            qemu: qemu-i386-static
+          - arch: armv7
+            packages: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+            qemu: qemu-arm-static
+          - arch: aarch64
+            packages: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            qemu: qemu-aarch64-static
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake make gcc g++ curl xz-utils qemu-user-static ${{ matrix.packages }}
+      - name: Build musl sysroot
+        env:
+          MUSL_BASE: ${{ runner.temp }}/musl
+        run: sh scripts/bootstrap-musl.sh ${{ matrix.arch }}
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchains/${{ matrix.arch }}-linux-musl.cmake \
+            -DMUSL_ROOT=${{ runner.temp }}/musl/${{ matrix.arch }} \
+            -DYT8531C_WERROR=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: |
+          if [ -n "${{ matrix.qemu }}" ]; then
+            ${{ matrix.qemu }} build/yt8531c_tests
+            ${{ matrix.qemu }} build/yt8531c_abi_test
+          else
+            ./build/yt8531c_tests
+            ./build/yt8531c_abi_test
+          fi
+
+  kernel-module:
+    name: Linux kernel module
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kernel headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc flex bison libssl-dev libelf-dev \
+            linux-headers-generic
+          KDIR="$(ls -d /usr/src/linux-headers-*-generic 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -z "$KDIR" ] || [ ! -f "$KDIR/Makefile" ]; then
+            KDIR="/lib/modules/$(uname -r)/build"
+          fi
+          test -f "$KDIR/Makefile"
+          {
+            echo "YT8531C_KERNEL_DIR=$KDIR"
+            if [ -f "$KDIR/Module.symvers" ]; then
+              echo "YT8531C_KMOD_MODPOST_WARN=OFF"
+            else
+              echo "YT8531C_KMOD_MODPOST_WARN=ON"
+            fi
+          } >> "$GITHUB_ENV"
+      - name: Build module
+        run: |
+          cmake -S . -B build-kmod \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DYT8531C_BUILD_TESTS=OFF \
+            -DYT8531C_BUILD_FREESTANDING=OFF \
+            -DYT8531C_BUILD_LINUX_USER=OFF \
+            -DYT8531C_BUILD_LINUX_KMOD=ON \
+            -DYT8531C_KERNEL_DIR="$YT8531C_KERNEL_DIR" \
+            -DYT8531C_KMOD_MODPOST_WARN="$YT8531C_KMOD_MODPOST_WARN"
+          cmake --build build-kmod --target yt8531c_kmod --parallel
