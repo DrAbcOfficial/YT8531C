@@ -636,11 +636,18 @@ yt_rc yt8531c_resume(yt8531c_dev *dev)
 	if (!yt8531c::detail::is_ready(dev))
 		return YT8531C_ERR_ARG;
 
-	/* Disable auto-sleep so the link comes back deterministically. */
-	rc = yt8531c::detail::ext_modify(dev, YT8531C_EXT_SLEEP_CTRL,
-					 YT8531C_SLEEP_CTRL_SLEEP_SW, 0u);
-	if (rc != YT8531C_OK)
-		return rc;
+	/*
+	 * Re-apply the configured auto-sleep setting instead of forcing it
+	 * off: boards that rely on auto-sleep keep it across a suspend and
+	 * resume cycle.
+	 */
+	if (dev->cfg.auto_sleep_disabled != 0u) {
+		rc = yt8531c::detail::ext_modify(dev, YT8531C_EXT_SLEEP_CTRL,
+						 YT8531C_SLEEP_CTRL_SLEEP_SW,
+						 0u);
+		if (rc != YT8531C_OK)
+			return rc;
+	}
 
 	if (dev->cfg.wol_enable != 0u || dev->wol_enabled != 0u)
 		return YT8531C_OK;

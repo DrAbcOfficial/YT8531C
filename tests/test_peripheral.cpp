@@ -252,6 +252,16 @@ void test_power_management(void)
 	YT_CHECK_EQ((fx.mock.mii_get(YT8531C_REG_BMCR) &
 		     YT8531C_BMCR_POWER_DOWN) != 0u,
 		    0);
+	/* Auto-sleep is a board choice: untouched when not configured off. */
+	YT_CHECK_EQ((fx.mock.ext_get(YT8531C_EXT_SLEEP_CTRL) &
+		     YT8531C_SLEEP_CTRL_SLEEP_SW) != 0u,
+		    1);
+
+	/* With auto-sleep disabled in the configuration, resume re-applies it. */
+	fx.cfg.auto_sleep_disabled = 1;
+	fx.reload();
+	fx.mock.ext_set(YT8531C_EXT_SLEEP_CTRL, 0x8000u);
+	YT_CHECK_EQ(yt8531c_resume(&fx.dev), YT8531C_OK);
 	YT_CHECK_EQ((fx.mock.ext_get(YT8531C_EXT_SLEEP_CTRL) &
 		     YT8531C_SLEEP_CTRL_SLEEP_SW) != 0u,
 		    0);
