@@ -6,6 +6,9 @@
  * standard library dependency.  This file is the only C glue: it translates
  * phylib callbacks into core calls and maps device-tree properties to the
  * board configuration.
+ *
+ * phylib APIs used below: the ethtool master/slave configuration requires
+ * Linux 5.18+, the LED hardware-control callbacks require Linux 6.3+.
  */
 
 #include <linux/bitops.h>
@@ -153,6 +156,8 @@ static int yt8531c_parse_delay(struct phy_device *phydev, const char *name,
 
 	if (device_property_read_u32(dev, name, &value) != 0) {
 		*delay_ps = 1950;
+		phydev_info(phydev, "%s missing, using default 1950 ps\n",
+			    name);
 		return 0;
 	}
 
@@ -213,6 +218,13 @@ static int yt8531c_build_config(struct phy_device *phydev,
 	yt8531c_config_default(cfg);
 
 	cfg->phy_addr = phydev->mdio.addr;
+
+	/* Boards without a phy-mode property still bind, as RGMII. */
+	if (phydev->interface == PHY_INTERFACE_MODE_NA) {
+		phydev_warn(phydev,
+			    "phy-mode is not specified, assuming rgmii\n");
+		phydev->interface = PHY_INTERFACE_MODE_RGMII;
+	}
 
 	ret = yt8531c_iface_to_core(phydev->interface, &cfg->interface);
 	if (ret != 0) {
@@ -659,8 +671,10 @@ static irqreturn_t yt8531c_handle_interrupt(struct phy_device *phydev)
 		return IRQ_NONE;
 
 	/*
-	 * This runs in interrupt context, so use the self-locking single
-	 * transfer accessor instead of taking the bus lock around the core.
+	 * phylib requests the PHY interrupt as a threaded handler, so this
+	 * runs in process context and phy_read() may sleep.  Use the
+	 * self-locking single transfer accessor instead of taking the bus
+	 * lock around the whole core.
 	 */
 	ret = phy_read(phydev, YT8531C_REG_INT_STATUS);
 
