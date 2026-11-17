@@ -162,7 +162,10 @@ yt_rc yt8531c_set_loopback(yt8531c_dev *dev, yt_u8 mode);
 yt_rc yt8531c_set_test_mode(yt8531c_dev *dev, yt_u8 mode);
 yt_rc yt8531c_set_jumbo(yt8531c_dev *dev, yt_u8 enable);
 
-/* Error counters (read-clear registers are cleared by reading). */
+/*
+ * Error counters.  The idle error and EEE wake error counters clear on
+ * read; the RX error counter only clears on a software reset.
+ */
 yt_rc yt8531c_get_counters(yt8531c_dev *dev, yt8531c_counters *counters);
 
 /* Raw register access, useful for board bring-up and diagnostics. */
