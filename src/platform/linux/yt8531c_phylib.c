@@ -410,30 +410,43 @@ static int yt8531c_phy_get_features(struct phy_device *phydev)
 static int yt8531c_phy_config_init(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
-
+	unsigned int tries = 0;
 	int ret;
 
 	if (priv == NULL)
 		return -ENODEV;
 
-	phy_lock_mdio_bus(phydev);
-	ret = yt8531c_errno(yt8531c_config_init(&priv->dev));
-	phy_unlock_mdio_bus(phydev);
+	/* A single MDIO transfer may fail transiently right after a reset. */
+	for (;; tries++) {
+		phy_lock_mdio_bus(phydev);
+		ret = yt8531c_errno(yt8531c_config_init(&priv->dev));
+		phy_unlock_mdio_bus(phydev);
+
+		if (ret == 0 || tries >= 2)
+			break;
+		msleep(20);
+	}
 	return ret;
 }
 
 static int yt8531c_soft_reset(struct phy_device *phydev)
 {
 	struct yt8531c_phy *priv = phydev->priv;
-
+	unsigned int tries = 0;
 	int ret;
 
 	if (priv == NULL)
 		return -ENODEV;
 
-	phy_lock_mdio_bus(phydev);
-	ret = yt8531c_errno(yt8531c_reset(&priv->dev));
-	phy_unlock_mdio_bus(phydev);
+	for (;; tries++) {
+		phy_lock_mdio_bus(phydev);
+		ret = yt8531c_errno(yt8531c_reset(&priv->dev));
+		phy_unlock_mdio_bus(phydev);
+
+		if (ret == 0 || tries >= 2)
+			break;
+		msleep(20);
+	}
 	return ret;
 }
 
