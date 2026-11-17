@@ -25,8 +25,6 @@ struct options {
 	int interface;
 	unsigned int tx_delay_ps;
 	unsigned int rx_delay_ps;
-	int have_tx_delay;
-	int have_rx_delay;
 };
 
 static void usage(FILE *out)
@@ -37,8 +35,8 @@ static void usage(FILE *out)
 		"  -i IFACE   network interface whose MDIO bus hosts the PHY\n"
 		"  -p PHY     PHY address (default: query with SIOCGMIIPHY)\n"
 		"  -m MODE    RGMII mode for init/aneg: rgmii, rxid, txid, id\n"
-		"  -t PS      TX internal delay in picoseconds (0..2250, step 150)\n"
-		"  -r PS      RX internal delay in picoseconds (0..2250, step 150)\n"
+		"  -t PS      TX internal delay in ps (0..2250, step 150, default 1950)\n"
+		"  -r PS      RX internal delay in ps (0..2250, step 150, default 1950)\n"
 		"  -v         verbose (log core diagnostics to stderr)\n"
 		"\n"
 		"commands:\n"
@@ -653,10 +651,8 @@ int main(int argc, char **argv)
 		.phy_addr = -1,
 		.verbose = 0,
 		.interface = YT8531C_IF_RGMII,
-		.tx_delay_ps = 0,
-		.rx_delay_ps = 0,
-		.have_tx_delay = 0,
-		.have_rx_delay = 0,
+		.tx_delay_ps = 1950,
+		.rx_delay_ps = 1950,
 	};
 	struct yt8531c_mdio_ctx mdio;
 	yt8531c_config cfg;
@@ -669,13 +665,16 @@ int main(int argc, char **argv)
 		case 'i':
 			opts.ifname = optarg;
 			break;
-		case 'p':
-			if (parse_uint(optarg, 10, 31,
-				       (unsigned int *)&opts.phy_addr) < 0) {
+		case 'p': {
+			unsigned int addr;
+
+			if (parse_uint(optarg, 10, 31, &addr) < 0) {
 				fprintf(stderr, "invalid PHY address\n");
 				return 1;
 			}
+			opts.phy_addr = (int)addr;
 			break;
+		}
 		case 'm':
 			if (parse_interface(optarg, &opts.interface) < 0) {
 				fprintf(stderr, "invalid interface mode\n");
@@ -687,14 +686,12 @@ int main(int argc, char **argv)
 				fprintf(stderr, "invalid TX delay\n");
 				return 1;
 			}
-			opts.have_tx_delay = 1;
 			break;
 		case 'r':
 			if (parse_uint(optarg, 10, 2250, &opts.rx_delay_ps) < 0) {
 				fprintf(stderr, "invalid RX delay\n");
 				return 1;
 			}
-			opts.have_rx_delay = 1;
 			break;
 		case 'v':
 			opts.verbose = 1;
@@ -723,10 +720,9 @@ int main(int argc, char **argv)
 	yt8531c_config_default(&cfg);
 	cfg.phy_addr = (yt_u8)mdio.phy_addr;
 	cfg.interface = (yt_u8)opts.interface;
-	if (opts.have_tx_delay)
-		cfg.tx_delay_ps = (yt_u16)opts.tx_delay_ps;
-	if (opts.have_rx_delay)
-		cfg.rx_delay_ps = (yt_u16)opts.rx_delay_ps;
+	/* Same defaults as the kernel DT path: 1950 ps unless overridden. */
+	cfg.tx_delay_ps = (yt_u16)opts.tx_delay_ps;
+	cfg.rx_delay_ps = (yt_u16)opts.rx_delay_ps;
 
 	port = yt8531c_mdio_port(&mdio);
 	if (yt8531c_init(&dev, &cfg, &port) != YT8531C_OK) {
