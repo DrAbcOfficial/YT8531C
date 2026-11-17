@@ -119,8 +119,9 @@ yt_rc program_advertisement(yt8531c_dev *dev)
 	if (rc != YT8531C_OK)
 		return rc;
 
-	return mii_write(dev, YT8531C_REG_CTRL1000,
-			 ctrl1000_from_config(&dev->cfg));
+	/* Modify only the advertisement bits: test modes must survive. */
+	return mii_modify(dev, YT8531C_REG_CTRL1000, YT8531C_CTRL1000_CFG_MASK,
+			  ctrl1000_from_config(&dev->cfg));
 }
 
 } /* namespace detail */
@@ -139,13 +140,14 @@ yt_rc yt8531c_config_aneg(yt8531c_dev *dev)
 	if (rc != YT8531C_OK)
 		return rc;
 
-	/* Enable auto-negotiation, leave isolation and power down. */
+	/* Enable auto-negotiation, leave isolation, power down and loopback. */
 	rc = yt8531c::detail::mii_modify(
 		dev, YT8531C_REG_BMCR,
 		static_cast<yt_u16>(YT8531C_BMCR_ANEG_ENABLE |
 				    YT8531C_BMCR_RESTART_ANEG |
 				    YT8531C_BMCR_ISOLATE |
-				    YT8531C_BMCR_POWER_DOWN),
+				    YT8531C_BMCR_POWER_DOWN |
+				    YT8531C_BMCR_LOOPBACK),
 		static_cast<yt_u16>(YT8531C_BMCR_ANEG_ENABLE |
 				    YT8531C_BMCR_RESTART_ANEG));
 	if (rc != YT8531C_OK)
@@ -185,6 +187,13 @@ yt_rc yt8531c_force_link(yt8531c_dev *dev, yt_u16 speed, yt_u8 duplex)
 	if (speed == YT8531C_SPEED_UNKNOWN)
 		return yt8531c_config_aneg(dev);
 
+	if (duplex != YT8531C_DUPLEX_HALF && duplex != YT8531C_DUPLEX_FULL)
+		return YT8531C_ERR_ARG;
+
+	/* The chip implements 1000BASE-T full duplex only. */
+	if (speed == YT8531C_SPEED_1000 && duplex == YT8531C_DUPLEX_HALF)
+		return YT8531C_ERR_UNSUPPORTED;
+
 	switch (speed) {
 	case YT8531C_SPEED_10:
 		break;
@@ -198,8 +207,6 @@ yt_rc yt8531c_force_link(yt8531c_dev *dev, yt_u16 speed, yt_u8 duplex)
 		return YT8531C_ERR_ARG;
 	}
 
-	if (duplex != YT8531C_DUPLEX_HALF && duplex != YT8531C_DUPLEX_FULL)
-		return YT8531C_ERR_ARG;
 	if (duplex == YT8531C_DUPLEX_FULL)
 		set |= YT8531C_BMCR_DUPLEX;
 

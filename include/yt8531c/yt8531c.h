@@ -105,11 +105,17 @@ yt_rc yt8531c_aneg_done(yt8531c_dev *dev, yt_u8 *done);
 /*
  * Force a fixed speed/duplex with auto-negotiation disabled, or restore
  * auto-negotiation with @speed == YT8531C_SPEED_UNKNOWN.  @duplex is ignored
- * when auto-negotiation is restored.
+ * when auto-negotiation is restored.  1000BASE-T half duplex is not
+ * implemented by the chip and returns YT8531C_ERR_UNSUPPORTED.
  */
 yt_rc yt8531c_force_link(yt8531c_dev *dev, yt_u16 speed, yt_u8 duplex);
 
-/* Read the current link status and decode speed, duplex, pause and MDIX. */
+/*
+ * Read the current link status and decode speed, duplex, pause and MDIX.
+ * With cfg->tx_clk_adj_enable set this may write the extended RGMII_CFG1
+ * register to apply the per-speed TX clock inversion of a newly resolved
+ * speed.
+ */
 yt_rc yt8531c_read_status(yt8531c_dev *dev, yt8531c_status *status);
 
 /* Report static capabilities plus the EEE abilities read from the chip. */

@@ -45,6 +45,24 @@ void test_aneg(void)
 	YT_CHECK_EQ(yt8531c_config_aneg(&fx.dev), YT8531C_OK);
 	YT_CHECK_EQ(fx.mock.mii_get(YT8531C_REG_CTRL1000),
 		    YT8531C_CTRL1000_ADV_1000_HALF);
+
+	/* Restarting auto-negotiation clears a digital loopback. */
+	YT_CHECK_EQ(yt8531c_set_loopback(&fx.dev, YT8531C_LOOPBACK_DIGITAL),
+		    YT8531C_OK);
+	YT_CHECK_EQ(yt8531c_config_aneg(&fx.dev), YT8531C_OK);
+	bmcr = fx.mock.mii_get(YT8531C_REG_BMCR);
+	YT_CHECK_EQ((bmcr & YT8531C_BMCR_LOOPBACK) != 0u, 0);
+	YT_CHECK_EQ((bmcr & YT8531C_BMCR_ANEG_ENABLE) != 0u, 1);
+
+	/* Re-programming the advertisement preserves the test-mode field. */
+	YT_CHECK_EQ(yt8531c_set_test_mode(&fx.dev, YT8531C_TEST_MODE_4),
+		    YT8531C_OK);
+	YT_CHECK_EQ(yt8531c_config_aneg(&fx.dev), YT8531C_OK);
+	YT_CHECK_EQ(field(YT8531C_CTRL1000_TEST_MASK,
+			  fx.mock.mii_get(YT8531C_REG_CTRL1000)),
+		    YT8531C_TEST_MODE_4);
+	YT_CHECK_EQ((fx.mock.mii_get(YT8531C_REG_CTRL1000) &
+		     YT8531C_CTRL1000_ADV_1000_HALF) != 0u, 1);
 }
 
 void test_force_and_status(void)
@@ -60,10 +78,11 @@ void test_force_and_status(void)
 		    YT8531C_OK);
 	YT_CHECK_EQ(fx.mock.mii_get(YT8531C_REG_BMCR), 0x2100u);
 
+	/* 1000BASE-T half duplex is not implemented by the chip. */
 	YT_CHECK_EQ(yt8531c_force_link(&fx.dev, YT8531C_SPEED_1000,
 				       YT8531C_DUPLEX_HALF),
-		    YT8531C_OK);
-	YT_CHECK_EQ(fx.mock.mii_get(YT8531C_REG_BMCR), 0x0040u);
+		    YT8531C_ERR_UNSUPPORTED);
+	YT_CHECK_EQ(fx.mock.mii_get(YT8531C_REG_BMCR), 0x2100u);
 
 	YT_CHECK_EQ(yt8531c_force_link(&fx.dev, YT8531C_SPEED_10,
 				       YT8531C_DUPLEX_HALF),
