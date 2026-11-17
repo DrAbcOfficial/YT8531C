@@ -81,7 +81,7 @@ void test_wol(void)
 	YT_CHECK_EQ(fx.mock.ext_get(YT8531C_EXT_WOL_MAC2), 0x0211u);
 	YT_CHECK_EQ(fx.mock.ext_get(YT8531C_EXT_WOL_MAC1), 0x2233u);
 	YT_CHECK_EQ(fx.mock.ext_get(YT8531C_EXT_WOL_MAC0), 0x4455u);
-	YT_CHECK_EQ(fx.mock.ext_get(YT8531C_EXT_WOL_CFG), 0x004fu);
+	YT_CHECK_EQ(fx.mock.ext_get(YT8531C_EXT_WOL_CFG), 0x004eu);
 	YT_CHECK_EQ((fx.mock.mii_get(YT8531C_REG_INT_MASK) &
 		     YT8531C_IRQ_WOL) != 0u,
 		    1);
@@ -104,6 +104,12 @@ void test_wol(void)
 		     YT8531C_IRQ_WOL) != 0u,
 		    0);
 	YT_CHECK_EQ(fx.dev.wol_enabled, 0);
+
+	/* The shared INT_N pin is level triggered; the pulse width is unused. */
+	YT_CHECK_EQ(yt8531c_wol_set(&fx.dev, mac, 1, 0,
+				    YT8531C_WOL_PULSE_168MS),
+		    YT8531C_OK);
+	YT_CHECK_EQ(fx.mock.ext_get(YT8531C_EXT_WOL_CFG), 0x000bu);
 
 	YT_CHECK_EQ(yt8531c_wol_set(&fx.dev, zero_mac, 1, 0, 0),
 		    YT8531C_ERR_ARG);

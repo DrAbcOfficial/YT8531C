@@ -139,7 +139,12 @@ yt_rc yt8531c_led_get(yt8531c_dev *dev, yt_u8 index, yt8531c_led_cfg *cfg);
 yt_rc yt8531c_led_blink_set(yt8531c_dev *dev, yt_u8 duty, yt_u8 freq1,
 			    yt_u8 freq2);
 
-/* Wake-on-LAN magic packet configuration. */
+/*
+ * Wake-on-LAN magic packet configuration.  With @pmeb_mode set the pin is a
+ * dedicated PME_N and pulses with @pulse_width; otherwise the pin stays a
+ * shared INT_N, which only supports a level-triggered active-low waveform
+ * and @pulse_width has no effect.
+ */
 yt_rc yt8531c_wol_set(yt8531c_dev *dev, const yt_u8 mac[6], yt_u8 enable,
 		      yt_u8 pmeb_mode, yt_u8 pulse_width);
 yt_rc yt8531c_wol_get(yt8531c_dev *dev, yt_u8 mac[6], yt_u8 *enable,

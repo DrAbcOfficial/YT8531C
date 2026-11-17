@@ -49,18 +49,25 @@ yt_rc yt8531c_wol_set(yt8531c_dev *dev, const yt_u8 mac[6], yt_u8 enable,
 		}
 	}
 
+	/*
+	 * EXT_0xA00A bit0 selects the PME_N waveform: 1 = level triggered,
+	 * 0 = pulse triggered with the width from bits 2:1.  The shared
+	 * INT_N pin only supports the level waveform, so the pulse width is
+	 * only meaningful on a dedicated PME_N pin.
+	 */
 	mask = static_cast<yt_u16>(
 		YT8531C_WOL_CFG_ENABLE | YT8531C_WOL_CFG_PMEB_INTB_SEL |
-		YT8531C_WOL_CFG_PULSE_WIDTH_MASK | YT8531C_WOL_CFG_TYPE_PULSE);
+		YT8531C_WOL_CFG_PULSE_WIDTH_MASK | YT8531C_WOL_CFG_TYPE_LEVEL);
 	set = 0u;
 
 	if (enable != 0u) {
 		set |= YT8531C_WOL_CFG_ENABLE;
 		set |= field_prep(YT8531C_WOL_CFG_PULSE_WIDTH_MASK,
 				  pulse_width);
-		set |= YT8531C_WOL_CFG_TYPE_PULSE;
 		if (pmeb_mode != 0u)
 			set |= YT8531C_WOL_CFG_PMEB_INTB_SEL;
+		else
+			set |= YT8531C_WOL_CFG_TYPE_LEVEL;
 	}
 
 	rc = ext_modify(dev, YT8531C_EXT_WOL_CFG, mask, set);
