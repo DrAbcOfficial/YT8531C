@@ -89,10 +89,35 @@ void test_init_validation(void)
 	YT_CHECK_EQ(yt8531c_init(&dev, &cfg, &fx.port), YT8531C_ERR_ARG);
 
 	yt8531c_config_default(&cfg);
-	cfg.int_mask = 0x0010;
+	cfg.int_mask = YT8531C_IRQ_LINK_UP;
 	YT_CHECK_EQ(yt8531c_init(&dev, &cfg, &fx.port), YT8531C_OK);
 	YT_CHECK_EQ(dev.magic, YT8531C_DEV_MAGIC);
 	YT_CHECK_EQ(dev.abi_version, YT8531C_VERSION);
+
+	yt8531c_config_default(&cfg);
+	cfg.int_mask = 0x0010;
+	YT_CHECK_EQ(yt8531c_init(&dev, &cfg, &fx.port), YT8531C_ERR_ARG);
+
+	yt8531c_config_default(&cfg);
+	cfg.struct_size = 0;
+	YT_CHECK_EQ(yt8531c_init(&dev, &cfg, &fx.port), YT8531C_ERR_ARG);
+
+	/* Re-initialising with cfg/port aliasing the context keeps the values. */
+	{
+		yt8531c_dev alias;
+		yt8531c_config alias_cfg;
+
+		yt8531c_config_default(&alias_cfg);
+		alias_cfg.phy_addr = 5;
+		YT_CHECK_EQ(yt8531c_init(&alias, &alias_cfg, &fx.port),
+			    YT8531C_OK);
+		YT_CHECK_EQ(yt8531c_init(&alias, &alias.cfg, &alias.port),
+			    YT8531C_OK);
+		YT_CHECK_EQ(alias.cfg.phy_addr, 5);
+		YT_CHECK_EQ(alias.cfg.interface, YT8531C_IF_RGMII);
+		YT_CHECK_EQ(alias.port.mdio_read, fx.port.mdio_read);
+		YT_CHECK_EQ(alias.magic, YT8531C_DEV_MAGIC);
+	}
 
 	expect_init_error(fx, YT8531C_OK);
 }

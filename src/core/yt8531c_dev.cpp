@@ -14,6 +14,13 @@ using namespace yt8531c::detail;
 
 yt_rc validate_config(const yt8531c_config *cfg)
 {
+	/* Reject configurations built against a different structure layout. */
+	if (cfg->struct_size != static_cast<yt_u32>(sizeof(*cfg)))
+		return YT8531C_ERR_ARG;
+
+	if ((cfg->int_mask & static_cast<yt_u16>(~YT8531C_IRQ_MASK_ALL)) != 0u)
+		return YT8531C_ERR_ARG;
+
 	if (cfg->phy_addr > 31u)
 		return YT8531C_ERR_ARG;
 
@@ -373,6 +380,8 @@ extern "C" {
 yt_rc yt8531c_init(yt8531c_dev *dev, const yt8531c_config *cfg,
 		   const yt8531c_port *port)
 {
+	yt8531c_config cfg_copy;
+	yt8531c_port port_copy;
 	yt_rc rc;
 
 	if (dev == nullptr || cfg == nullptr || port == nullptr)
@@ -386,15 +395,22 @@ yt_rc yt8531c_init(yt8531c_dev *dev, const yt8531c_config *cfg,
 	if (rc != YT8531C_OK)
 		return rc;
 
+	/*
+	 * Copy before clearing: @cfg and @port may alias the members of @dev
+	 * when a caller re-initialises an embedded context.
+	 */
+	cfg_copy = *cfg;
+	port_copy = *port;
+
 	yt8531c::detail::mem_zero(dev, sizeof(*dev));
 
 	dev->abi_version = YT8531C_VERSION_MAKE(YT8531C_VERSION_MAJOR,
 						YT8531C_VERSION_MINOR,
 						YT8531C_VERSION_PATCH);
 	dev->struct_size = static_cast<yt_u32>(sizeof(*dev));
-	dev->cfg = *cfg;
-	dev->port = *port;
-	dev->int_mask = cfg->int_mask;
+	dev->cfg = cfg_copy;
+	dev->port = port_copy;
+	dev->int_mask = cfg_copy.int_mask;
 	dev->magic = YT8531C_DEV_MAGIC;
 	dev->ldo_voltage = YT8531C_LDO_VOLTAGE_3V3;
 
