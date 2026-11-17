@@ -11,6 +11,7 @@
 #
 # Environment:
 #   MUSL_VERSION  musl release to build            (default 1.2.5)
+#   MUSL_SHA256   expected SHA-256 of the tarball; verified when set
 #   MUSL_BASE     installation prefix root         (default: cache dir)
 #   MUSL_WORK     build work directory             (default: temp dir)
 
@@ -28,6 +29,16 @@ if [ ! -f "$tarball" ]; then
     echo "fetching musl-$version"
     curl -sSL -o "$tarball" \
         "https://musl.libc.org/releases/musl-$version.tar.gz"
+fi
+
+if [ -n "${MUSL_SHA256:-}" ]; then
+    if ! echo "$MUSL_SHA256  $tarball" | sha256sum --check --status; then
+        echo "musl-$version.tar.gz: checksum mismatch" >&2
+        exit 1
+    fi
+    echo "musl-$version.tar.gz: checksum ok"
+else
+    echo "warning: set MUSL_SHA256 to verify the musl tarball" >&2
 fi
 
 build_one() {
