@@ -13,6 +13,7 @@
 
 #include <linux/bitops.h>
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/leds.h>
@@ -305,6 +306,7 @@ static int yt8531c_phy_probe(struct phy_device *phydev)
 	struct yt8531c_config cfg;
 	yt8531c_port port;
 	yt8531c_id id;
+	unsigned int tries = 0;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -323,11 +325,27 @@ static int yt8531c_phy_probe(struct phy_device *phydev)
 		return ret;
 
 	port = yt8531c_linux_port(phydev);
-	phy_lock_mdio_bus(phydev);
-	ret = yt8531c_errno(yt8531c_init(&priv->dev, &cfg, &port));
-	if (ret == 0)
-		ret = yt8531c_errno(yt8531c_probe(&priv->dev, &id));
-	phy_unlock_mdio_bus(phydev);
+
+	/*
+	 * Rebinding a PHY driver runs remove/probe in quick succession, and
+	 * phylib asserts the hardware reset line in between.  Right after
+	 * deassertion the MDIO interface is not necessarily usable yet: some
+	 * PHYs do not drive their receiver and the bus reads back all ones,
+	 * while controllers may report transient transfer errors.  Retry the
+	 * init/probe pair with a small delay before giving up.
+	 */
+	for (tries = 0;; tries++) {
+		phy_lock_mdio_bus(phydev);
+		ret = yt8531c_errno(yt8531c_init(&priv->dev, &cfg, &port));
+		if (ret == 0)
+			ret = yt8531c_errno(yt8531c_probe(&priv->dev, &id));
+		phy_unlock_mdio_bus(phydev);
+
+		if (ret == YT8531C_OK || tries >= 5)
+			break;
+		msleep(50);
+	}
+
 	if (ret != 0)
 		return ret;
 
